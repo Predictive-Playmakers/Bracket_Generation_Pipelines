@@ -10,14 +10,14 @@ with open("config.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
 # Extract database and Vertex AI configurations
-INSTANCE_CONNECTION_NAME = config["database"]["instance_connection_name"]
-DB_USER = config["database"]["user"]
-DB_PASS = config["database"]["password"]
-DB_NAME = config["database"]["name"]
+INSTANCE_CONNECTION_NAME = config["INSTANCE_CONNECTION_NAME"]
+DB_USER = config["USER"]
+DB_PASS = config["PASSWORD"]
+DB_NAME = config["NAME"]
 
-PROJECT_ID = config["vertex_ai"]["project_id"]
-REGION = config["vertex_ai"]["region"]
-ENDPOINT_ID = config["vertex_ai"]["endpoint_id"]
+PROJECT_ID = config["PROJECT_ID"]
+REGION = config["REGION"]
+ENDPOINT_ID = config["ENDPOINT_ID"]
 
 
 # Initialize database connector
