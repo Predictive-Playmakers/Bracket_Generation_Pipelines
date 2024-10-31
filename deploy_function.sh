@@ -17,7 +17,10 @@ gcloud functions deploy "$FUNCTION_NAME" \
   --runtime="python312" \
   --entry-point="$CODE_ENTRYPOINT" \
   --env-vars-file env.yaml \
-  --trigger-http
+  --trigger-http \
+  --no-allow-unauthenticated \
+  --memory="1GB" \
+  --timeout="300s"
 
 # Confirm completion
 if [ $? -eq 0 ]; then
