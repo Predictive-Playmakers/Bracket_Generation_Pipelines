@@ -20,19 +20,22 @@ REGION = config["REGION"]
 ENDPOINT_ID = config["ENDPOINT_ID"]
 
 
-# Initialize database connector
-connector = Connector()
+def get_db_connection(connector):
+    try:
+        # Initialize database connector
+        connector = Connector()
 
-
-def get_db_connection():
-    # Securely connect to MySQL database using Cloud SQL connector
-    return connector.connect(
-        INSTANCE_CONNECTION_NAME,
-        "pymysql",
-        user=DB_USER,
-        password=DB_PASS,
-        db=DB_NAME,
-    )
+        connection = connector.connect(
+            INSTANCE_CONNECTION_NAME,
+            "pymysql",
+            user=DB_USER,
+            password=DB_PASS,
+            db=DB_NAME,
+        )
+        return connection
+    except Exception as e:
+        print("Failed to connect to Cloud SQL:", e)
+        raise
 
 
 @functions_framework.http
@@ -45,11 +48,11 @@ def predict_iris(request):
 
     iris_ids = request_json["iris_ids"]
 
+    print("Iris IDs:", iris_ids)
     try:
         # Step 1: Connect to Cloud SQL to fetch iris sample features
         conn = get_db_connection()
         cursor = conn.cursor()
-
         feature_rows = []
 
         # Fetch features for each iris sample ID
@@ -64,11 +67,17 @@ def predict_iris(request):
             if iris_features:
                 feature_rows.append(list(iris_features))
 
+        print("Fetched iris features")
+        print("Feature rows:", feature_rows)
+
         # Step 2: Call Vertex AI endpoint with batch of iris features
         aiplatform.init(project=PROJECT_ID, location=REGION)
         endpoint = aiplatform.Endpoint(endpoint_name=ENDPOINT_ID)
+        print("Initialized Vertex AI endpoint")
 
         predictions = endpoint.predict(instances=feature_rows).predictions
+        print("Received predictions from Vertex AI")
+        print("Predictions:", predictions)
 
         # Step 3v1: Prepare predictions for JSON response
         results_data = [
