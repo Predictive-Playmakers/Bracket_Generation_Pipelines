@@ -1,4 +1,4 @@
 functions-framework==3.*
-google-cloud-sql-connector
-pymysql
 google-cloud-aiplatform
+PyYAML
+cloud-sql-python-connector[pymysql]
