@@ -12,7 +12,7 @@ with open("config.yaml", "r") as config_file:
 # Extract database and Vertex AI configurations
 INSTANCE_CONNECTION_NAME = config["database"]["instance_connection_name"]
 DB_USER = config["database"]["user"]
-# DB_PASS = config["database"]["password"]
+DB_PASS = config["database"]["password"]
 DB_NAME = config["database"]["name"]
 
 PROJECT_ID = config["vertex_ai"]["project_id"]
@@ -30,7 +30,7 @@ def get_db_connection():
         INSTANCE_CONNECTION_NAME,
         "pymysql",
         user=DB_USER,
-        # password=DB_PASS,
+        password=DB_PASS,
         db=DB_NAME,
     )
 
