@@ -6,7 +6,7 @@ from google.cloud import aiplatform
 from google.cloud.sql.connector import Connector
 from flask import jsonify
 
-with open("config.yaml", "r") as config_file:
+with open("env.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
 # Extract database and Vertex AI configurations

@@ -16,7 +16,7 @@ gcloud functions deploy "$FUNCTION_NAME" \
   --region="us-east4" \
   --runtime="python312" \
   --entry-point="$CODE_ENTRYPOINT" \
-  --env-vars-file config.yaml \
+  --env-vars-file env.yaml \
   --trigger-http
 
 # Confirm completion
