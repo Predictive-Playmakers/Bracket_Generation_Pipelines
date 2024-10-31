@@ -11,9 +11,9 @@ with open("env.yaml", "r") as config_file:
 
 # Extract database and Vertex AI configurations
 INSTANCE_CONNECTION_NAME = config["INSTANCE_CONNECTION_NAME"]
-DB_USER = config["USER"]
-DB_PASS = config["PASSWORD"]
-DB_NAME = config["NAME"]
+DB_USER = config["DB_USER"]
+DB_PASS = config["DB_PASS"]
+DB_NAME = config["DB_NAME"]
 
 PROJECT_ID = config["PROJECT_ID"]
 REGION = config["REGION"]
