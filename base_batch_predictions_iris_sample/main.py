@@ -22,8 +22,6 @@ ENDPOINT_ID = config["ENDPOINT_ID"]
 
 def get_db_connection(connector):
     try:
-        # Initialize database connector
-        connector = Connector()
 
         connection = connector.connect(
             INSTANCE_CONNECTION_NAME,
@@ -51,7 +49,9 @@ def predict_iris(request):
     print("Iris IDs:", iris_ids)
     try:
         # Step 1: Connect to Cloud SQL to fetch iris sample features
-        conn = get_db_connection()
+        # Initialize database connector
+        connector = Connector()
+        conn = get_db_connection(connector)
         cursor = conn.cursor()
         feature_rows = []
 
@@ -76,35 +76,32 @@ def predict_iris(request):
         print("Initialized Vertex AI endpoint")
 
         predictions = endpoint.predict(instances=feature_rows).predictions
-        print("Received predictions from Vertex AI")
+
+        # get_shap_tree_explainer = pkl.loads(model_path)
+        # shap_preds = get_shap_tree_explainer(model, feature_rows)
+
+        # print("Received predictions from Vertex AI")
         print("Predictions:", predictions)
 
-        # Step 3v1: Prepare predictions for JSON response
-        results_data = [
-            {"id": iris_id, "prediction": pred}
-            for iris_id, pred in zip(iris_ids, predictions)
-        ]
+        # Step 3v2: Store predictions in MySQL `iris_results` table
+        results_data = [(iris_id, pred) for iris_id, pred in zip(iris_ids, predictions)]
 
-        # Return predictions as JSON response
-        return jsonify({"predictions": results_data}), 200
+        insert_query = """
+            INSERT INTO iris_results (id, prediction, shap_values)
+            VALUES (%s, %s)
+        """
 
-        # # Step 3v2: Store predictions in MySQL `iris_results` table
-        # results_data = [(iris_id, pred) for iris_id, pred in zip(iris_ids, predictions)]
+        cursor.executemany(insert_query, results_data)
+        conn.commit()  # Commit transaction
+        print("Stored predictions in Cloud SQL")
 
-        # insert_query = """
-        #     INSERT INTO iris_results (id, prediction)
-        #     VALUES (%s, %s)
-        # """
+        # Close database connection
+        cursor.close()
+        conn.close()
 
-        # cursor.executemany(insert_query, results_data)
-        # conn.commit()  # Commit transaction
-
-        # # Close database connection
-        # cursor.close()
-        # conn.close()
-
-        # # Return a success response
+        # Return a success response
         # return jsonify({"status": "Predictions stored successfully"}), 200
+        return jsonify({"predictions": results_data}), 200
 
     except Exception as e:
         print("Error:", e)
