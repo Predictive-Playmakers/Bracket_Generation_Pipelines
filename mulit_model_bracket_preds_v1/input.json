@@ -1,0 +1,214 @@
+//general input SMU is 1374, Rice is 1349
+{
+    "starting_bracket":
+    [
+        {"teamA":"SMU",
+        "seedA":1,
+        "teamB":"Rice",
+        "seedB":64
+        }
+    ]
+}
+
+
+//full working sample input
+
+{
+    "starting_bracket":
+    [
+        {
+            "teamA": "Drake",
+            "seedA": 7,
+            "teamB": "Grambling",
+            "seedB": 9
+        },
+        {
+            "teamA": "Baylor",
+            "seedA": 14,
+            "teamB": "Duke",
+            "seedB": 10
+        },
+        {
+            "teamA": "W Illinois",
+            "seedA": 15,
+            "teamB": "Bucknell",
+            "seedB": 10
+        },
+        {
+            "teamA": "Michigan St",
+            "seedA": 3,
+            "teamB": "WI Green Bay",
+            "seedB": 10
+        },
+        {
+            "teamA": "TN Martin",
+            "seedA": 7,
+            "teamB": "Lipscomb",
+            "seedB": 3
+        },
+        {
+            "teamA": "MS Valley St",
+            "seedA": 8,
+            "teamB": "Bryant",
+            "seedB": 8
+        },
+        {
+            "teamA": "MTSU",
+            "seedA": 11,
+            "teamB": "Washington",
+            "seedB": 9
+        },
+        {
+            "teamA": "Binghamton",
+            "seedA": 14,
+            "teamB": "Washington St",
+            "seedB": 15
+        },
+        {
+            "teamA": "SC Upstate",
+            "seedA": 3,
+            "teamB": "TAM C. Christi",
+            "seedB": 11
+        },
+        {
+            "teamA": "Appalachian St",
+            "seedA": 15,
+            "teamB": "E Kentucky",
+            "seedB": 2
+        },
+        {
+            "teamA": "Maine",
+            "seedA": 2,
+            "teamB": "Denver",
+            "seedB": 2
+        },
+        {
+            "teamA": "Kansas St",
+            "seedA": 4,
+            "teamB": "Hofstra",
+            "seedB": 14
+        },
+        {
+            "teamA": "Notre Dame",
+            "seedA": 12,
+            "teamB": "Navy",
+            "seedB": 16
+        },
+        {
+            "teamA": "Montana St",
+            "seedA": 10,
+            "teamB": "IUPUI",
+            "seedB": 11
+        },
+        {
+            "teamA": "Elon",
+            "seedA": 2,
+            "teamB": "E Illinois",
+            "seedB": 16
+        },
+        {
+            "teamA": "Monmouth NJ",
+            "seedA": 5,
+            "teamB": "Lehigh",
+            "seedB": 4
+        },
+        {
+            "teamA": "NE Omaha",
+            "seedA": 1,
+            "teamB": "UTRGV",
+            "seedB": 13
+        },
+        {
+            "teamA": "Marquette",
+            "seedA": 11,
+            "teamB": "Manhattan",
+            "seedB": 3
+        },
+        {
+            "teamA": "UNC Wilmington",
+            "seedA": 2,
+            "teamB": "Louisiana Tech",
+            "seedB": 5
+        },
+        {
+            "teamA": "Lamar",
+            "seedA": 16,
+            "teamB": "Mercer",
+            "seedB": 3
+        },
+        {
+            "teamA": "Morehead St",
+            "seedA": 13,
+            "teamB": "Pacific",
+            "seedB": 12
+        },
+        {
+            "teamA": "MA Lowell",
+            "seedA": 11,
+            "teamB": "W Salem St",
+            "seedB": 8
+        },
+        {
+            "teamA": "WKU",
+            "seedA": 13,
+            "teamB": "Towson",
+            "seedB": 2
+        },
+        {
+            "teamA": "Georgetown",
+            "seedA": 13,
+            "teamB": "Rice",
+            "seedB": 1
+        },
+        {
+            "teamA": "Illinois",
+            "seedA": 9,
+            "teamB": "S Carolina St",
+            "seedB": 6
+        },
+        {
+            "teamA": "Southern Indiana",
+            "seedA": 13,
+            "teamB": "Army",
+            "seedB": 10
+        },
+        {
+            "teamA": "UT Arlington",
+            "seedA": 1,
+            "teamB": "Louisiana",
+            "seedB": 1
+        },
+        {
+            "teamA": "Tennessee St",
+            "seedA": 5,
+            "teamB": "Delaware",
+            "seedB": 13
+        },
+        {
+            "teamA": "Penn St",
+            "seedA": 9,
+            "teamB": "Valparaiso",
+            "seedB": 14
+        },
+        {
+            "teamA": "Fordham",
+            "seedA": 6,
+            "teamB": "VMI",
+            "seedB": 7
+        },
+        {
+            "teamA": "TCU",
+            "seedA": 1,
+            "teamB": "Colgate",
+            "seedB": 12
+        },
+        {
+            "teamA": "Cleveland St",
+            "seedA": 3,
+            "teamB": "South Alabama",
+            "seedB": 7
+        }
+    ]
+    
+        
+}
