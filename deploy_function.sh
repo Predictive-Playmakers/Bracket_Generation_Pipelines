@@ -18,7 +18,7 @@ gcloud functions deploy "$FUNCTION_NAME" \
   --entry-point="$CODE_ENTRYPOINT" \
   --env-vars-file env.yaml \
   --trigger-http \
-  --no-allow-unauthenticated \
+  --allow-unauthenticated \
   --memory="1GB" \
   --timeout="300s"
 
