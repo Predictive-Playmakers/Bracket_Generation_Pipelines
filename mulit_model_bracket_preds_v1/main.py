@@ -42,7 +42,8 @@ def load_from_gcs(file_path, bucket_name="general_bucket_predictive-playmakers")
 
     # Check if the file already exists locally
     if os.path.exists(local_path):
-        print(f"File already exists locally: {local_path}")
+        # print(f"File already exists locally: {local_path}")
+        pass
     else:
         print(f"File not found locally. Downloading from GCS: {file_path}")
 
@@ -66,7 +67,7 @@ def load_from_gcs(file_path, bucket_name="general_bucket_predictive-playmakers")
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
-    print(f"Retrieved {local_path}")
+    # print(f"Retrieved {local_path}")
     return result
 
 
@@ -80,7 +81,7 @@ def get_team_id(teamA_name, teamB_name):
 
 
 def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, svm):
-    print(f"{teamA_name} vs {teamB_name}")
+    # print(f"{teamA_name} vs {teamB_name}")
     teamA_id, teamB_id = get_team_id(teamA_name, teamB_name)
 
     # Code for the input of 2 team Ids
@@ -258,9 +259,9 @@ def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, svm):
     rf_prob = rf.predict_proba(new_game_features)
     svm_prob = svm.predict_proba(new_game_features)
 
-    print(
-        f"The Win probability for the LR {lr_prob}, the Random Forest {rf_prob} and the SVM {svm_prob}"
-    )
+    # print(
+    #     f"The Win probability for the LR {lr_prob}, the Random Forest {rf_prob} and the SVM {svm_prob}"
+    # )
 
     lr_team, rf_team, svm_team = 0, 0, 0
     lr_p, rf_p, sv_p = 0, 0, 0
@@ -308,7 +309,7 @@ def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, svm):
     new_dict["TeamB_Turnover Ratio: "] = teamB_stats["B_TODIFF"].iloc[0]
     new_dict["TeamB_Efficiency Rating: "] = teamB_stats["B_NET_RAT"].iloc[0]
     new_dict["Winner"] = winner
-    print(f"winner: {winner}")
+    # print(f"winner: {winner}")
 
     return lr_prob, rf_prob, svm_prob, new_dict
 
@@ -326,64 +327,120 @@ def predict_bracket(request):
 
     starting_bracket = request_json["starting_bracket"]
 
-    print("Starting Bracket:", starting_bracket)
+    # print("Starting Bracket:", starting_bracket)
     try:
-        # step 1: load the features to use for the results
+        # Load features and models
         features = load_from_gcs("data/prediction_features/V1/team_features.csv")
-
-        # Step 2: get predictions and explanations
-        # step 2.1 download the models from storage and load them
         lr = load_from_gcs("models/main_models/test_V0.1/lr_model_v1.0.pkl")
+        rf = load_from_gcs("models/main_models/test_V0.1/rf_model_v1.0.pkl")
+        svm = load_from_gcs("models/main_models/test_V0.1/svm_model_v1.0.pkl")
 
-        rf = load_from_gcs(
-            "models/main_models/test_V0.1/rf_model_v1.0.pkl",
-        )
+        results = {}  # Dictionary to store results
 
-        svm = load_from_gcs(
-            "models/main_models/test_V0.1/svm_model_v1.0.pkl",
-        )
+        # Process each division
+        for division in starting_bracket.keys():
+            if "division" not in division:
+                # Skip non-division keys
+                continue
 
-        # step 2.2 get preds
-        total_teams = len(starting_bracket) * 2
-        rounds = int(np.log2(total_teams))
+            # Initialize results for this division
+            division_results = {f"round0": []}
 
-        print(f"Total Teams: {total_teams}, Total Rounds: {rounds}")
+            current_round = starting_bracket[division]["round0"]
+            round_idx = 0
 
-        current_round = starting_bracket
-        results = {}  # Dictionary to store the results
+            while (
+                current_round
+            ):  # Continue processing while there are matches to process
+                next_round = []
+                division_results[f"round{round_idx}"] = []
 
-        for round_idx in range(rounds):  # Iterate through rounds
-            print(f"\nProcessing Round {round_idx}")
-            next_round = []
+                for match_idx, match in enumerate(current_round):
+                    teamA = match["teams"][0]
+                    teamB = match["teams"][1]
 
-            for match_idx, matchup in enumerate(current_round):
-                lr_prob, rf_prob, svm_prob, game_stats = who_won(
-                    teamA_name=matchup["teamA"],
-                    seedA=matchup["seedA"],
-                    teamB_name=matchup["teamB"],
-                    seedB=matchup["seedB"],
-                    s_hist_agg=features,
-                    lr=lr,
-                    rf=rf,
-                    svm=svm,
-                )
-                results[f"{round_idx}-{match_idx}"] = game_stats
+                    # Call the prediction function
+                    lr_prob, rf_prob, svm_prob, game_stats = who_won(
+                        teamA_name=teamA["name"],
+                        seedA=teamA["seed"],
+                        teamB_name=teamB["name"],
+                        seedB=teamB["seed"],
+                        s_hist_agg=features,
+                        lr=lr,
+                        rf=rf,
+                        svm=svm,
+                    )
 
-                # Collect winners for the next round
-                next_round.append(game_stats["Winner"])
+                    # Add game stats to results for the current round and division
+                    match_id = f"{round_idx}-{match_idx}"
+                    division_results[f"round{round_idx}"].append(
+                        {
+                            "id": match_id,
+                            "teams": [
+                                {
+                                    "name": teamA["name"],
+                                    "seed": teamA["seed"],
+                                    "score": teamA.get("score", 0),
+                                },
+                                {
+                                    "name": teamB["name"],
+                                    "seed": teamB["seed"],
+                                    "score": teamB.get("score", 0),
+                                },
+                            ],
+                            "result": game_stats,
+                        }
+                    )
 
-            if len(next_round) != 1:
-                # Create matches for the next round
+                    # Determine the winner and prepare for the next round
+                    winner = game_stats["Winner"]
+                    next_round.append(
+                        {
+                            "id": f"{round_idx + 1}-{len(next_round)}",
+                            "teams": [
+                                {
+                                    "name": winner,
+                                    "seed": (
+                                        teamA["seed"]
+                                        if winner == teamA["name"]
+                                        else teamB["seed"]
+                                    ),
+                                }
+                            ],
+                        }
+                    )
+
+                # Check if this is the final round
+                if len(next_round) == 1:
+                    # Process the final match
+                    # final_match = next_round[0]
+                    # teamA = final_match["teams"][0]
+
+                    # # Add final winner to the results
+                    # division_results[f"round{round_idx + 1}"] = [
+                    #     {
+                    #         "id": f"{round_idx + 1}-0",
+                    #         "teams": [{"name": teamA["name"], "seed": teamA["seed"]}],
+                    #         "result": {"Winner": teamA["name"]},
+                    #     }
+                    # ]
+                    break  # Exit the loop since the final winner is determined
+
+                # Update current round and increment round index
                 current_round = [
                     {
-                        "teamA": next_round[j],
-                        "seedA": j,
-                        "teamB": next_round[j + 1],
-                        "seedB": j + 1,
+                        "id": f"{round_idx + 1}-{idx // 2}",
+                        "teams": [
+                            next_round[idx]["teams"][0],
+                            next_round[idx + 1]["teams"][0],
+                        ],
                     }
-                    for j in range(0, len(next_round), 2)
+                    for idx in range(0, len(next_round), 2)
                 ]
-        return jsonify(results), 200
+                round_idx += 1
+
+            # Store the division results
+            results[division] = division_results
 
         # step 2.3 get explanations
         # predictions = results
@@ -392,7 +449,7 @@ def predict_bracket(request):
         # shap_preds = get_shap_tree_explainer(model, feature_rows)
 
         # print("Received predictions from Vertex AI")
-        print("Predictions:", results)
+        # print("Predictions:", results)
         return jsonify(results), 200
 
         # return jsonify({"predictions": results_data}), 200
