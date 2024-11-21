@@ -319,7 +319,10 @@ def predict_bracket(request):
     # Parse JSON input from request
     request_json = request.get_json(silent=True)
     if not request_json or "starting_bracket" not in request_json:
-        return "Invalid input: 'starting_bracket' list required", 400
+        return (
+            "Invalid input: 'starting_bracket' key with a list value pair required",
+            400,
+        )
 
     starting_bracket = request_json["starting_bracket"]
 
@@ -380,6 +383,7 @@ def predict_bracket(request):
                     }
                     for j in range(0, len(next_round), 2)
                 ]
+        return jsonify(results), 200
 
         # step 2.3 get explanations
         # predictions = results
