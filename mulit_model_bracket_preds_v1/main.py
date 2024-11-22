@@ -21,22 +21,6 @@ DB_PASS = config["DB_PASS"]
 DB_NAME = config["DB_NAME"]
 
 
-def get_db_connection(connector):
-    try:
-
-        connection = connector.connect(
-            INSTANCE_CONNECTION_NAME,
-            "pymysql",
-            user=DB_USER,
-            password=DB_PASS,
-            db=DB_NAME,
-        )
-        return connection
-    except Exception as e:
-        print("Failed to connect to Cloud SQL:", e)
-        raise
-
-
 def load_from_gcs(file_path, bucket_name="general_bucket_predictive-playmakers"):
     file_name = file_path.split("/")[-1]
     local_path = f"/tmp/{file_name}"
@@ -46,7 +30,7 @@ def load_from_gcs(file_path, bucket_name="general_bucket_predictive-playmakers")
         # print(f"File already exists locally: {local_path}")
         pass
     else:
-        print(f"File not found locally. Downloading from GCS: {file_path}")
+        # print(f"File not found locally. Downloading from GCS: {file_path}")
 
         # Initialize the GCS client
         client = storage.Client()
@@ -81,238 +65,137 @@ def get_team_id(teamA_name, teamB_name):
     return team_a.values[0], team_b.values[0]
 
 
-def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, svm):
-    # print(f"{teamA_name} vs {teamB_name}")
+def cinderella_weight(
+    teamA_stats, teamB_stats, seedA, seedB, teamA_id, teamB_id, kpom, rpi
+):
+
+    a_rpi = rpi[["ATeamID", "A_RPI"]].groupby("ATeamID")["A_RPI"].mean().reset_index()
+    b_rpi = rpi[["BTeamID", "B_RPI"]].groupby("BTeamID")["B_RPI"].mean().reset_index()
+    # print("The rpi's", a_rpi, b_rpi)
+
+    weight = 1.0
+
+    if (seedB - seedA) >= 5:
+        weight += 1.50
+    if "B_AvgScore" in teamB_stats and "A_AvgScore" in teamA_stats:
+        if np.int32(teamB_stats["B_AvgScore"]) > np.int32(teamA_stats["A_AvgScore"]):
+            weight += 0.55
+    if teamA_id in kpom["TeamID"].values and teamB_id in kpom["TeamID"].values:
+        if (
+            kpom.loc[kpom["TeamID"] == teamA_id, "luck"].values[0]
+            > kpom.loc[kpom["TeamID"] == teamB_id, "luck"].values[0]
+        ):
+            weight += 0.25
+    if teamA_id in a_rpi["ATeamID"].values and teamB_id in b_rpi["BTeamID"].values:
+        if (
+            b_rpi.loc[b_rpi["BTeamID"] == teamA_id, "B_RPI"].values[0]
+            > a_rpi.loc[a_rpi["ATeamID"] == teamB_id, "A_RPI"].values[0]
+        ):
+            weight += -0.15
+
+    # print("cinderella weight")
+    return weight
+
+
+def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, kpom, rpi):
+
     teamA_id, teamB_id = get_team_id(teamA_name, teamB_name)
 
     # Code for the input of 2 team Ids
-    # team_stats_df = s_hist_agg.set_index('TeamID')
     team_stats_df = s_hist_agg.copy()
-    # Trying to build a weighting, but instead used the more recent seasons
-    team_stats_df["weight"] = team_stats_df["Season"].apply(
-        lambda x: 1 / (2024 - x + 1)
-    )
-    team_stats_df = team_stats_df.groupby("TeamID", as_index=False).mean()
+
     team_stats_df = team_stats_df.set_index("TeamID")
-    # cols = [col for col in team_stats_df.columns if col not in ['weight', 'Season']]
-    # weighted_team_stats = team_stats_df.apply(lambda x: (x[cols] * x['weight']).sum() / x['weight'].sum(),
-    #                                           axis=1).reset_index()
-    # print(weighted_team_stats)
-
-    # team_stats_df.to_csv("data/sample_stats_1.csv")
-
-    # print(team_stats_df)
     # Grab from f_df
     teamA_stats = team_stats_df.loc[[teamA_id]].add_prefix("A_")
-    # print("Team stats A", teamA_stats)
-    teamA_stats = teamA_stats[
+    teamA_stats_adj = teamA_stats[
         [
-            "A_Matches_Played",
             "A_Score",
             "A_OppScore",
-            "A_FGR",
-            "A_OppFGR",
-            "A_ORCHANCE",
-            "A_OppORCHANCE",
-            "A_ORR",
-            "A_OppORR",
-            "A_PFDIFF",
-            "A_OppPFDIFF",
-            "A_FGADIFF",
-            "A_OppFGADIFF",
-            "A_FGA2",
-            "A_OppFGA2",
-            "A_FG2PCT",
-            "A_OppFG2PCT",
-            "A_POSS",
-            "A_OppPOSS",
-            "A_PPP",
-            "A_OppPPP",
-            "A_OER",
-            "A_OppOER",
-            "A_DER",
-            "A_OppDER",
-            "A_NET_RAT",
+            "A_NumOT",
+            "A_FGM",
+            "A_FGA",
+            "A_FGM3",
+            "A_FGA3",
+            "A_FTM",
+            "A_FTA",
+            "A_OR",
+            "A_DR",
+            "A_Ast",
+            "A_TO",
+            "A_Stl",
+            "A_Blk",
+            "A_PF",
             "A_OppNET_RAT",
-            "A_DRR",
-            "A_OppDRR",
-            "A_AstRatio",
-            "A_OppAstRatio",
-            "A_Pace",
-            "A_OppPace",
-            "A_FTARate",
-            "A_OppFTARate",
-            "A_3PAR",
-            "A_Opp3PAR",
-            "A_eFG",
-            "A_OppeFG",
-            "A_TRR",
-            "A_OppTRR",
-            "A_Astper",
-            "A_OppAstper",
-            "A_Stlper",
-            "A_OppStlper",
-            "A_Blkper",
-            "A_OppBlkper",
-            "A_PPSA",
-            "A_OppPPSA",
-            "A_FGperc",
-            "A_OppFGperc",
-            "A_3Fper",
-            "A_Opp3Fper",
-            "A_ToRatio",
-            "A_OppToRatio",
-            "A_Matches_Won",
-            "A_WinRatio",
-            "A_LossRatio",
-            "A_AvgScore",
-            "A_AvgOppScore",
-            "A_ScoreDiff",
-            "A_TODIFF",
-            "A_STLDIFF",
-            "A_BLKDIFF",
         ]
     ]
-    # teamA_stats = teamA_stats['A_Matches_Played', 'A_Score',
-    # 'A_OppScore', 'A_NumOT']
+
     teamB_stats = team_stats_df.loc[[teamB_id]].add_prefix("B_")
-    teamB_stats = teamB_stats[
+    teamB_stats_adj = teamB_stats[
         [
-            "B_Matches_Played",
             "B_Score",
             "B_OppScore",
-            "B_FGR",
-            "B_OppFGR",
-            "B_ORCHANCE",
-            "B_OppORCHANCE",
-            "B_ORR",
-            "B_OppORR",
-            "B_PFDIFF",
-            "B_OppPFDIFF",
-            "B_FGADIFF",
-            "B_OppFGADIFF",
-            "B_FGA2",
-            "B_OppFGA2",
-            "B_FG2PCT",
-            "B_OppFG2PCT",
-            "B_POSS",
-            "B_OppPOSS",
-            "B_PPP",
-            "B_OppPPP",
-            "B_OER",
-            "B_OppOER",
-            "B_DER",
-            "B_OppDER",
-            "B_NET_RAT",
+            "B_NumOT",
+            "B_FGM",
+            "B_FGA",
+            "B_FGM3",
+            "B_FGA3",
+            "B_FTM",
+            "B_FTA",
+            "B_OR",
+            "B_DR",
+            "B_Ast",
+            "B_TO",
+            "B_Stl",
+            "B_Blk",
+            "B_PF",
             "B_OppNET_RAT",
-            "B_DRR",
-            "B_OppDRR",
-            "B_AstRatio",
-            "B_OppAstRatio",
-            "B_Pace",
-            "B_OppPace",
-            "B_FTARate",
-            "B_OppFTARate",
-            "B_3PAR",
-            "B_Opp3PAR",
-            "B_eFG",
-            "B_OppeFG",
-            "B_TRR",
-            "B_OppTRR",
-            "B_Astper",
-            "B_OppAstper",
-            "B_Stlper",
-            "B_OppStlper",
-            "B_Blkper",
-            "B_OppBlkper",
-            "B_PPSA",
-            "B_OppPPSA",
-            "B_FGperc",
-            "B_OppFGperc",
-            "B_3Fper",
-            "B_Opp3Fper",
-            "B_ToRatio",
-            "B_OppToRatio",
-            "B_Matches_Won",
-            "B_WinRatio",
-            "B_LossRatio",
-            "B_AvgScore",
-            "B_AvgOppScore",
-            "B_ScoreDiff",
-            "B_TODIFF",
-            "B_STLDIFF",
-            "B_BLKDIFF",
         ]
     ]
 
-    # new_game_features = pd.DataFrame([{**teamA_stats, **teamB_stats}])
     new_game_features = pd.concat(
-        [teamA_stats.reset_index(drop=True), teamB_stats.reset_index(drop=True)],
+        [
+            teamA_stats_adj.reset_index(drop=True),
+            teamB_stats_adj.reset_index(drop=True),
+        ],
         axis=1,
-        ignore_index=True,
     )
-
-    # print("The new game features", new_game_features)
-
-    # print(teamB_stats)
 
     lr_prob = lr.predict_proba(new_game_features)
     rf_prob = rf.predict_proba(new_game_features)
-    svm_prob = svm.predict_proba(new_game_features)
+    # print(f"The Win probability for the LR {lr_prob}, the Random Forest {rf_prob}")
 
-    # print(
-    #     f"The Win probability for the LR {lr_prob}, the Random Forest {rf_prob} and the SVM {svm_prob}"
-    # )
+    # Cinderella Weighting Calculation
 
-    lr_team, rf_team, svm_team = 0, 0, 0
-    lr_p, rf_p, sv_p = 0, 0, 0
+    c_weight = cinderella_weight(
+        teamA_stats, teamB_stats, seedA, seedB, teamA_id, teamB_id, kpom, rpi
+    )
+    # print("The cinderella weight: ", c_weight)
 
-    if lr_prob[0][1] > lr_prob[0][0]:
-        lr_team_w = teamB_id
-        lr_team_l = teamA_id
-        lr_p = lr_prob[0][1]
-    else:
-        lr_team_w = teamA_id
-        lr_team_l = teamB_id
-        lr_p = lr_prob[0][0]
+    win_prob = ((np.int32(lr_prob[0][1] * c_weight) + np.int32(rf_prob[0][1])) / 2) - (
+        ((np.int32(lr_prob[0][0]) * c_weight) + np.int32(rf_prob[0][0])) / 2
+    )
 
-    if rf_prob[0][1] > rf_prob[0][0]:
-        rf_team = teamB_id
-        rf_p = rf_prob[0][1]
-    else:
-        rf_team = teamA_id
-        rf_p = rf_prob[0][0]
-
-    if svm_prob[0][1] > svm_prob[0][0]:
-        svm_team = teamB_id
-        svm_p = svm_prob[0][1]
-    else:
-        svm_team = teamA_id
-        svm_p = svm_prob[0][0]
-
-    # Some Cinderella Weighting Calculation
-
-    # Example of how to pick the winner and loser above
-
-    winner = ""
-    if teamB_id == lr_team_w:
-        winner = teamB_name
-    else:
+    y = 0
+    # print("The Win Probability", win_prob)
+    if win_prob > 0:
         winner = teamA_name
+        y = 1
+    else:
+        winner = teamB_name
 
-    new_dict = {}
-    new_dict["TeamA"] = teamA_name
-    new_dict["TeamA_Avg Points Per Game: "] = teamA_stats["A_AvgScore"].iloc[0]
-    new_dict["TeamA_Turnover Ratio: "] = teamA_stats["A_TODIFF"].iloc[0]
-    new_dict["TeamA_Efficiency Rating: "] = teamA_stats["A_NET_RAT"].iloc[0]
-    new_dict["TeamB"] = teamB_name
-    new_dict["TeamB_Avg Points Per Game: "] = teamB_stats["B_AvgScore"].iloc[0]
-    new_dict["TeamB_Turnover Ratio: "] = teamB_stats["B_TODIFF"].iloc[0]
-    new_dict["TeamB_Efficiency Rating: "] = teamB_stats["B_NET_RAT"].iloc[0]
-    new_dict["Winner"] = winner
-    # print(f"winner: {winner}")
+    # Output Dictionary of the winnner
+    winner_dict = {}
+    winner_dict["TeamA"] = teamA_name
+    winner_dict["TeamA_Avg Points Per Game: "] = teamA_stats["A_AvgScore"].iloc[0]
+    winner_dict["TeamA_Turnover Ratio: "] = teamA_stats["A_TODIFF"].iloc[0]
+    winner_dict["TeamA_Efficiency Rating: "] = teamA_stats["A_NET_RAT"].iloc[0]
+    winner_dict["TeamB"] = teamB_name
+    winner_dict["TeamB_Avg Points Per Game: "] = teamB_stats["B_AvgScore"].iloc[0]
+    winner_dict["TeamB_Turnover Ratio: "] = teamB_stats["B_TODIFF"].iloc[0]
+    winner_dict["TeamB_Efficiency Rating: "] = teamB_stats["B_NET_RAT"].iloc[0]
+    winner_dict["Winner"] = winner
 
-    return lr_prob, rf_prob, svm_prob, new_dict
+    return lr_prob, rf_prob, winner_dict, y
 
 
 @functions_framework.http
@@ -340,10 +223,14 @@ def predict_bracket(request):
     # print("Starting Bracket:", starting_bracket)
     try:
         # Load features and models
-        features = load_from_gcs("data/prediction_features/V1/team_features.csv")
-        lr = load_from_gcs("models/main_models/test_V0.1/lr_model_v1.0.pkl")
-        rf = load_from_gcs("models/main_models/test_V0.1/rf_model_v1.0.pkl")
-        svm = load_from_gcs("models/main_models/test_V0.1/svm_model_v1.0.pkl")
+        features = load_from_gcs("data/prediction_features/V2/team_features.csv")
+        kpom = load_from_gcs("data/prediction_features/V2/kenpom_luck_teamID.csv")
+        rpi = load_from_gcs("data/prediction_features/V2/rpi_data.csv")
+
+        lr = load_from_gcs("models/main_models/V2.0/lr_model_v2.0.pkl")
+        rf = load_from_gcs("models/main_models/V2.0/rf_model_v2.0.pkl")
+
+        # soon add in the explainer!
 
         results = {}  # Dictionary to store division results
         finals = {"semifinals": [], "championship": {}}  # Structure for finals
@@ -371,7 +258,7 @@ def predict_bracket(request):
                     teamB = match["teams"][1]
 
                     # Call the prediction function
-                    lr_prob, rf_prob, svm_prob, game_stats = who_won(
+                    game_stats = who_won(
                         teamA_name=teamA["name"],
                         seedA=teamA["seed"],
                         teamB_name=teamB["name"],
@@ -379,8 +266,9 @@ def predict_bracket(request):
                         s_hist_agg=features,
                         lr=lr,
                         rf=rf,
-                        svm=svm,
-                    )
+                        kpom=kpom,
+                        rpi=rpi,
+                    )[2]
 
                     # Add game stats to results for the current round and division
                     match_id = f"{round_idx}-{match_idx}"
@@ -452,9 +340,10 @@ def predict_bracket(request):
             s_hist_agg=features,
             lr=lr,
             rf=rf,
-            svm=svm,
+            kpom=kpom,
+            rpi=rpi,
         )[
-            3
+            2
         ]  # Extract game stats
 
         finals["semifinals"].append(
@@ -473,9 +362,10 @@ def predict_bracket(request):
             s_hist_agg=features,
             lr=lr,
             rf=rf,
-            svm=svm,
+            kpom=kpom,
+            rpi=rpi,
         )[
-            3
+            2
         ]  # Extract game stats
 
         finals["semifinals"].append(
@@ -503,9 +393,10 @@ def predict_bracket(request):
             s_hist_agg=features,
             lr=lr,
             rf=rf,
-            svm=svm,
+            kpom=kpom,
+            rpi=rpi,
         )[
-            3
+            2
         ]  # Extract game stats
 
         finals["championship"] = {
