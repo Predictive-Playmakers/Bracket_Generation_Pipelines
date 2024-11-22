@@ -18,15 +18,15 @@
     [
         {
             "teamA": "Drake",
-            "seedA": 7,
+            "seedA": 1,
             "teamB": "Grambling",
-            "seedB": 9
+            "seedB": 64
         },
         {
             "teamA": "Baylor",
-            "seedA": 14,
+            "seedA": 2,
             "teamB": "Duke",
-            "seedB": 10
+            "seedB": 63
         },
         {
             "teamA": "W Illinois",
