@@ -97,7 +97,52 @@ def cinderella_weight(
     return weight
 
 
-def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, kpom, rpi):
+def shap_to_json(explainer, winner_id, X_sample):
+    """
+    Convert SHAP output to JSON compatible with the React visualization package.
+
+    Parameters:
+    - explainer: SHAP explainer object
+    - X_sample: Input data (single sample or multiple rows as a DataFrame)
+
+    Returns:
+    - JSON object as a Python dictionary
+    """
+    shap_values = explainer.shap_values(X_sample.iloc[0])
+    # print(shap_values.shape)
+
+    # Base value (expected value of the model output)
+    base_value = explainer.expected_value[0]  # Assuming a single output model
+    shap_json = {"data": []}
+
+    for i in range(X_sample.shape[0]):  # Iterate over each sample
+        shap_data = {
+            "outNames": ["output value"],
+            "baseValue": base_value,
+            "outValue": base_value
+            + sum(shap_value[winner_id] for shap_value in shap_values),
+            "link": "identity",
+            "featureNames": X_sample.columns.tolist(),
+            "features": {},
+            "plot_cmap": "DrDb",
+            "labelMargin": 20,
+        }
+
+        # Add feature details
+        for j, feature_name in enumerate(X_sample.columns):
+            shap_data["features"][str(j)] = {
+                "effect": shap_values[j][winner_id],
+                "value": X_sample.iloc[i, j],
+            }
+
+        shap_json["data"].append(shap_data)
+
+    return shap_json
+
+
+def who_won(
+    teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, kpom, rpi, rf_explainer
+):
 
     teamA_id, teamB_id = get_team_id(teamA_name, teamB_name)
 
@@ -195,7 +240,9 @@ def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, kpom, rpi)
     winner_dict["TeamB_Efficiency Rating: "] = teamB_stats["B_NET_RAT"].iloc[0]
     winner_dict["Winner"] = winner
 
-    return lr_prob, rf_prob, winner_dict, y
+    shap_json = shap_to_json(rf_explainer, y, new_game_features)
+
+    return winner_dict, shap_json
 
 
 @functions_framework.http
@@ -229,6 +276,7 @@ def predict_bracket(request):
 
         lr = load_from_gcs("models/main_models/V2.0/lr_model_v2.0.pkl")
         rf = load_from_gcs("models/main_models/V2.0/rf_model_v2.0.pkl")
+        rf_explainer = load_from_gcs("models/main_models/V2.0/rf_explainerV2.0.pkl")
 
         # soon add in the explainer!
 
@@ -258,7 +306,7 @@ def predict_bracket(request):
                     teamB = match["teams"][1]
 
                     # Call the prediction function
-                    game_stats = who_won(
+                    game_stats, shap_json = who_won(
                         teamA_name=teamA["name"],
                         seedA=teamA["seed"],
                         teamB_name=teamB["name"],
@@ -268,7 +316,8 @@ def predict_bracket(request):
                         rf=rf,
                         kpom=kpom,
                         rpi=rpi,
-                    )[2]
+                        rf_explainer=rf_explainer,
+                    )
 
                     # Add game stats to results for the current round and division
                     match_id = f"{round_idx}-{match_idx}"
@@ -288,6 +337,7 @@ def predict_bracket(request):
                                 },
                             ],
                             "result": game_stats,
+                            "shap": shap_json,
                         }
                     )
 
@@ -332,7 +382,7 @@ def predict_bracket(request):
             results[division] = division_results
 
         # Process semifinals
-        sf_game_stats_1 = who_won(
+        sf_game_stats_1, shap_json = who_won(
             teamA_name=division_winners["division0"]["name"],
             seedA=division_winners["division0"]["seed"],
             teamB_name=division_winners["division1"]["name"],
@@ -342,19 +392,19 @@ def predict_bracket(request):
             rf=rf,
             kpom=kpom,
             rpi=rpi,
-        )[
-            2
-        ]  # Extract game stats
+            rf_explainer=rf_explainer,
+        )
 
         finals["semifinals"].append(
             {
                 "id": "sf-1",
                 "teams": [division_winners["division0"], division_winners["division1"]],
                 "results": sf_game_stats_1,
+                "shap": shap_json,
             }
         )
 
-        sf_game_stats_2 = who_won(
+        sf_game_stats_2, shap_json = who_won(
             teamA_name=division_winners["division2"]["name"],
             seedA=division_winners["division2"]["seed"],
             teamB_name=division_winners["division3"]["name"],
@@ -364,20 +414,19 @@ def predict_bracket(request):
             rf=rf,
             kpom=kpom,
             rpi=rpi,
-        )[
-            2
-        ]  # Extract game stats
-
+            rf_explainer=rf_explainer,
+        )
         finals["semifinals"].append(
             {
                 "id": "sf-2",
                 "teams": [division_winners["division2"], division_winners["division3"]],
                 "results": sf_game_stats_2,
+                "shap": shap_json,
             }
         )
 
         # Process championship
-        final_game_stats = who_won(
+        final_game_stats, shap_json = who_won(
             teamA_name=sf_game_stats_1["Winner"],
             seedA=next(
                 team["seed"]
@@ -395,9 +444,8 @@ def predict_bracket(request):
             rf=rf,
             kpom=kpom,
             rpi=rpi,
-        )[
-            2
-        ]  # Extract game stats
+            rf_explainer=rf_explainer,
+        )
 
         finals["championship"] = {
             "id": "final",
@@ -422,6 +470,7 @@ def predict_bracket(request):
                 },
             ],
             "results": final_game_stats,
+            "shap": shap_json,
         }
 
         # Combine results and finals
