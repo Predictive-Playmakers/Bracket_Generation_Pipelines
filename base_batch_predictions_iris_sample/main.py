@@ -1,9 +1,6 @@
 import json
 import yaml
-import pymysql
 import functions_framework
-from google.cloud import aiplatform
-from google.cloud.sql.connector import Connector
 from flask import jsonify
 
 with open("env.yaml", "r") as config_file:
