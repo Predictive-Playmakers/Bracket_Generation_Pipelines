@@ -1,15 +1,11 @@
-import json
 import yaml
-import pymysql
 import functions_framework
-from google.cloud.sql.connector import Connector
-from flask import jsonify
+from flask import jsonify, make_response
 import pickle
 import pandas as pd
 from google.cloud import storage
 import os
 import numpy as np
-from flask import jsonify, make_response
 
 with open("env.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
