@@ -335,9 +335,11 @@ def predict_bracket(request):
         rf = load_from_gcs("models/main_models/test_V0.1/rf_model_v1.0.pkl")
         svm = load_from_gcs("models/main_models/test_V0.1/svm_model_v1.0.pkl")
 
-        results = {}  # Dictionary to store results
+        results = {}  # Dictionary to store division results
+        finals = {"semifinals": [], "championship": {}}  # Structure for finals
 
         # Process each division
+        division_winners = {}
         for division in starting_bracket.keys():
             if "division" not in division:
                 # Skip non-division keys
@@ -345,7 +347,6 @@ def predict_bracket(request):
 
             # Initialize results for this division
             division_results = {f"round0": []}
-
             current_round = starting_bracket[division]["round0"]
             round_idx = 0
 
@@ -412,18 +413,8 @@ def predict_bracket(request):
 
                 # Check if this is the final round
                 if len(next_round) == 1:
-                    # Process the final match
-                    # final_match = next_round[0]
-                    # teamA = final_match["teams"][0]
-
-                    # # Add final winner to the results
-                    # division_results[f"round{round_idx + 1}"] = [
-                    #     {
-                    #         "id": f"{round_idx + 1}-0",
-                    #         "teams": [{"name": teamA["name"], "seed": teamA["seed"]}],
-                    #         "result": {"Winner": teamA["name"]},
-                    #     }
-                    # ]
+                    winner_team = next_round[0]["teams"][0]
+                    division_winners[division] = winner_team
                     break  # Exit the loop since the final winner is determined
 
                 # Update current round and increment round index
@@ -442,14 +433,108 @@ def predict_bracket(request):
             # Store the division results
             results[division] = division_results
 
-        # step 2.3 get explanations
-        # predictions = results
+        # Process semifinals
+        sf_game_stats_1 = who_won(
+            teamA_name=division_winners["division0"]["name"],
+            seedA=division_winners["division0"]["seed"],
+            teamB_name=division_winners["division1"]["name"],
+            seedB=division_winners["division1"]["seed"],
+            s_hist_agg=features,
+            lr=lr,
+            rf=rf,
+            svm=svm,
+        )[
+            3
+        ]  # Extract game stats
 
-        # get_shap_tree_explainer = pkl.loads(model_path)
-        # shap_preds = get_shap_tree_explainer(model, feature_rows)
+        finals["semifinals"].append(
+            {
+                "id": "sf-1",
+                "teams": [division_winners["division0"], division_winners["division1"]],
+                "results": sf_game_stats_1,
+            }
+        )
 
-        # print("Received predictions from Vertex AI")
-        # print("Predictions:", results)
+        sf_game_stats_2 = who_won(
+            teamA_name=division_winners["division2"]["name"],
+            seedA=division_winners["division2"]["seed"],
+            teamB_name=division_winners["division3"]["name"],
+            seedB=division_winners["division3"]["seed"],
+            s_hist_agg=features,
+            lr=lr,
+            rf=rf,
+            svm=svm,
+        )[
+            3
+        ]  # Extract game stats
+
+        finals["semifinals"].append(
+            {
+                "id": "sf-2",
+                "teams": [division_winners["division2"], division_winners["division3"]],
+                "results": sf_game_stats_2,
+            }
+        )
+
+        # Process championship
+        final_game_stats = who_won(
+            teamA_name=sf_game_stats_1["Winner"],
+            seedA=next(
+                team["seed"]
+                for team in finals["semifinals"][0]["teams"]
+                if team["name"] == sf_game_stats_1["Winner"]
+            ),
+            teamB_name=sf_game_stats_2["Winner"],
+            seedB=next(
+                team["seed"]
+                for team in finals["semifinals"][1]["teams"]
+                if team["name"] == sf_game_stats_2["Winner"]
+            ),
+            s_hist_agg=features,
+            lr=lr,
+            rf=rf,
+            svm=svm,
+        )[
+            3
+        ]  # Extract game stats
+
+        finals["championship"] = {
+            "id": "final",
+            "teams": [
+                {
+                    "name": sf_game_stats_1["Winner"],
+                    "seed": next(
+                        team["seed"]
+                        for team in finals["semifinals"][0]["teams"]
+                        if team["name"] == sf_game_stats_1["Winner"]
+                    ),
+                    "score": 0,
+                },
+                {
+                    "name": sf_game_stats_2["Winner"],
+                    "seed": next(
+                        team["seed"]
+                        for team in finals["semifinals"][1]["teams"]
+                        if team["name"] == sf_game_stats_2["Winner"]
+                    ),
+                    "score": 0,
+                },
+            ],
+            "results": final_game_stats,
+        }
+
+        # Combine results and finals
+        results["finals"] = finals
+
+        return {"results": results}
+
+    except Exception as e:
+        print("Error:", e)
+        return {"status": "Error", "details": str(e)}
+
+        # take the div0 round3 winner and div1 round 3 winner and insert them into
+        # results['finals']['']
+
         return jsonify(results), 200
 
         # return jsonify({"predictions": results_data}), 200
