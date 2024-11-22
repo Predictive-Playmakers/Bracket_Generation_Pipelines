@@ -9,6 +9,7 @@ import pandas as pd
 from google.cloud import storage
 import os
 import numpy as np
+from flask import jsonify, make_response
 
 with open("env.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
@@ -317,13 +318,22 @@ def who_won(teamA_name, seedA, teamB_name, seedB, s_hist_agg, lr, rf, svm):
 @functions_framework.http
 def predict_bracket(request):
     """HTTP Cloud Function to process iris sample IDs, call Vertex AI, and store results."""
+    # handle CORS Policy
+    if request.method == "OPTIONS":
+        response = make_response("", 204)  # No content for preflight
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+
     # Parse JSON input from request
     request_json = request.get_json(silent=True)
     if not request_json or "starting_bracket" not in request_json:
-        return (
-            "Invalid input: 'starting_bracket' key with a list value pair required",
-            400,
+        response = make_response(
+            "Invalid input: 'starting_bracket' key with a list value pair required", 400
         )
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return response
 
     starting_bracket = request_json["starting_bracket"]
 
@@ -526,44 +536,15 @@ def predict_bracket(request):
         # Combine results and finals
         results["finals"] = finals
 
-        return {"results": results}
+        results_dict = {"results": results}
+
+        # Build response with CORS headers
+        response = make_response(jsonify(results_dict), 200)
+        response.headers["Access-Control-Allow-Origin"] = "*"  # Allow all origins
+        return response
 
     except Exception as e:
         print("Error:", e)
-        return {"status": "Error", "details": str(e)}
-
-        # take the div0 round3 winner and div1 round 3 winner and insert them into
-        # results['finals']['']
-
-        return jsonify(results), 200
-
-        # return jsonify({"predictions": results_data}), 200
-
-        # Step 3v2: Store predictions in MySQL `iris_results` table
-        # results_data = [(iris_id, pred) for iris_id, pred in zip(iris_ids, predictions)]
-
-        # insert_query = """
-        #     INSERT INTO iris_results (id, prediction, shap_values)
-        #     VALUES (%s, %s)
-        # """
-
-        # cursor.executemany(insert_query, results_data)
-        # conn.commit()  # Commit transaction
-        # print("Stored predictions in Cloud SQL")
-
-        # # Close database connection
-        # cursor.close()
-        # conn.close()
-
-        # Return a success response
-        # return jsonify({"status": "Predictions stored successfully"}), 200
-        # return jsonify({"predictions": results_data}), 200
-
-    except Exception as e:
-        print("Error:", e)
-        return jsonify({"status": "Error", "details": str(e)}), 500
-
-    finally:
-        pass
-        # Clean up connector to avoid open connections
-        # connector.close()
+        response = make_response(jsonify({"status": "Error", "details": str(e)}), 500)
+        response.headers["Access-Control-Allow-Origin"] = "*"  # Add CORS headers
+        return response
